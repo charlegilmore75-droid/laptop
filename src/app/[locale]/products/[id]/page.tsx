@@ -47,8 +47,13 @@ async function getRelated(categoryId: string, excludeId: string) {
     take: 4,
     include: {
       category: true,
+      reviews: {
+        include: {
+          user: { select: { name: true, avatar: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      },
       _count: { select: { reviews: true } },
-      reviews: { select: { rating: true } },
     },
   });
 }
@@ -61,52 +66,69 @@ export default async function ProductDetailPage({ params }: Props) {
     () => []
   );
 
-  const avgRating = product.reviews.length
-    ? product.reviews.reduce((a, r) => a + r.rating, 0) /
-      product.reviews.length
-    : 0;
+  // ✅ safe avg rating
+  const avgRating =
+    product.reviews.length > 0
+      ? product.reviews.reduce((a, r) => a + r.rating, 0) /
+        product.reviews.length
+      : 0;
 
-  const serialize = (p: typeof product) => ({
+  // ✅ SAFE serializer (fix null vs undefined + Prisma mismatch)
+  const serialize = (p: any) => ({
     ...p,
     avgRating,
-    specsAr: p.specsAr as Record<string, string> | null,
-    specsEn: p.specsEn as Record<string, string> | null,
+    specsAr: p.specsAr ?? null,
+    specsEn: p.specsEn ?? null,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
-    category: {
-      ...p.category,
-      createdAt: p.category.createdAt.toISOString(),
-      updatedAt: p.category.updatedAt.toISOString(),
-    },
-    reviews: p.reviews.map((r) => ({
-      ...r,
+    category: p.category
+      ? {
+          ...p.category,
+          createdAt: p.category.createdAt.toISOString(),
+          updatedAt: p.category.updatedAt.toISOString(),
+        }
+      : null,
+    reviews: (p.reviews || []).map((r: any) => ({
+      id: r.id,
+      userId: r.userId,
+      productId: r.productId,
+      rating: r.rating,
+      comment: r.comment ?? null,
+      isApproved: r.isApproved,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
+      user: {
+        name: r.user?.name ?? undefined,
+        avatar: r.user?.avatar ?? undefined,
+      },
     })),
   });
 
-  const serializeRelated = (items: typeof related) =>
-    items.map((r) => {
-      const reviews = r.reviews;
+  // ✅ safe related serializer
+  const serializeRelated = (items: any[]) =>
+    (items || []).map((r) => {
+      const ratings = r.reviews || [];
 
-      const ratingsOnly = reviews.map((rv) => rv.rating);
-
-      const avgRating = ratingsOnly.length
-        ? ratingsOnly.reduce((a, b) => a + b, 0) / ratingsOnly.length
-        : 0;
+      const avg =
+        ratings.length > 0
+          ? ratings.reduce((a: number, b: any) => a + b.rating, 0) /
+            ratings.length
+          : 0;
 
       return {
         ...r,
-        avgRating,
-        specsAr: r.specsAr as Record<string, string> | null,
-        specsEn: r.specsEn as Record<string, string> | null,
+        avgRating: avg,
+        specsAr: r.specsAr ?? null,
+        specsEn: r.specsEn ?? null,
         createdAt: r.createdAt.toISOString(),
         updatedAt: r.updatedAt.toISOString(),
-        category: {
-          ...r.category,
-          createdAt: r.category.createdAt.toISOString(),
-          updatedAt: r.category.updatedAt.toISOString(),
-        },
+        category: r.category
+          ? {
+              ...r.category,
+              createdAt: r.category.createdAt.toISOString(),
+              updatedAt: r.category.updatedAt.toISOString(),
+            }
+          : null,
       };
     });
 
