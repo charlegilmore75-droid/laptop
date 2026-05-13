@@ -87,13 +87,17 @@ export default async function ProductDetailPage({ params }: Props) {
 
   const serializeRelated = (items: typeof related) =>
     items.map((r) => {
-      const reviews = r.reviews as any[];
+      const reviews = r.reviews;
+
+      const ratingsOnly = reviews.map((rv) => rv.rating);
+
+      const avgRating = ratingsOnly.length
+        ? ratingsOnly.reduce((a, b) => a + b, 0) / ratingsOnly.length
+        : 0;
 
       return {
         ...r,
-        avgRating: reviews.length
-          ? reviews.reduce((a, rv) => a + rv.rating, 0) / reviews.length
-          : 0,
+        avgRating,
         specsAr: r.specsAr as Record<string, string> | null,
         specsEn: r.specsEn as Record<string, string> | null,
         createdAt: r.createdAt.toISOString(),
@@ -111,16 +115,8 @@ export default async function ProductDetailPage({ params }: Props) {
       <Navbar />
       <main className="container mx-auto px-4 py-10 min-h-screen">
         <ProductDetailClient
-          product={
-            serialize(product) as Parameters<
-              typeof ProductDetailClient
-            >[0]['product']
-          }
-          related={
-            serializeRelated(related) as Parameters<
-              typeof ProductDetailClient
-            >[0]['related']
-          }
+          product={serialize(product)}
+          related={serializeRelated(related)}
           locale={params.locale}
         />
       </main>
