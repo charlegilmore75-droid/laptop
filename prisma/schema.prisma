@@ -1,0 +1,371 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  OUT_OF_STOCK
+}
+
+enum WalletTopupStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MessageStatus {
+  SENT
+  SEEN
+}
+
+model User {
+  id                String              @id @default(cuid())
+  name              String?
+  email             String              @unique
+  emailVerified     DateTime?
+  passwordHash      String?
+  phone             String?
+  address           String?
+  avatar            String?
+  role              Role                @default(USER)
+  isBanned          Boolean             @default(false)
+  language          String              @default("ar")
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  orders            Order[]
+  reviews           Review[]
+  wishlist          WishlistItem[]
+  wallet            Wallet?
+  walletTopups      WalletTopupRequest[]
+  notifications     Notification[]
+  conversations     Conversation[]
+  messages          Message[]
+  otpCodes          OTPCode[]
+  passwordResets    PasswordReset[]
+  compareList       CompareItem[]
+  usedCoupons       CouponUsage[]
+
+  @@map("users")
+}
+
+model OTPCode {
+  id        String   @id @default(cuid())
+  userId    String?
+  email     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("otp_codes")
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_resets")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  nameAr      String
+  nameEn      String
+  slug        String    @unique
+  image       String?
+  description String?
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id            String         @id @default(cuid())
+  nameAr        String
+  nameEn        String
+  descriptionAr String?        @db.Text
+  descriptionEn String?        @db.Text
+  price         Float
+  discountPrice Float?
+  stock         Int            @default(0)
+  images        String[]
+  thumbnail     String?
+  categoryId    String
+  brand         String?
+  model         String?
+  specsAr       Json?
+  specsEn       Json?
+  isFeatured    Boolean        @default(false)
+  isActive      Boolean        @default(true)
+  slug          String         @unique
+  sku           String?        @unique
+  weight        Float?
+  tags          String[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  category      Category       @relation(fields: [categoryId], references: [id])
+  orderItems    OrderItem[]
+  reviews       Review[]
+  wishlist      WishlistItem[]
+  compareItems  CompareItem[]
+
+  @@map("products")
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  userId          String
+  fullName        String
+  phone           String
+  address         String
+  shippingBranch  String?
+  status          OrderStatus @default(PENDING)
+  totalAmount     Float
+  paidFromWallet  Boolean     @default(false)
+  walletAmountUsed Float?
+  couponId        String?
+  discountAmount  Float?
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  user            User        @relation(fields: [userId], references: [id])
+  items           OrderItem[]
+  coupon          Coupon?     @relation(fields: [couponId], references: [id])
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model Wallet {
+  id           String               @id @default(cuid())
+  userId       String               @unique
+  balance      Float                @default(0)
+  isActive     Boolean              @default(true)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id          String   @id @default(cuid())
+  walletId    String
+  amount      Float
+  type        String
+  description String?
+  referenceId String?
+  createdAt   DateTime @default(now())
+  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@map("wallet_transactions")
+}
+
+model WalletTopupRequest {
+  id              String            @id @default(cuid())
+  userId          String
+  paymentMethodId String
+  amount          Float
+  transactionRef  String?
+  receiptImage    String?
+  status          WalletTopupStatus @default(PENDING)
+  adminNote       String?
+  approvedAmount  Float?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  user            User              @relation(fields: [userId], references: [id])
+  paymentMethod   PaymentMethod     @relation(fields: [paymentMethodId], references: [id])
+
+  @@map("wallet_topup_requests")
+}
+
+model PaymentMethod {
+  id           String               @id @default(cuid())
+  nameAr       String
+  nameEn       String
+  description  String?
+  accountInfo  String?
+  logo         String?
+  isActive     Boolean              @default(true)
+  sortOrder    Int                  @default(0)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  topupRequests WalletTopupRequest[]
+
+  @@map("payment_methods")
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  rating    Int
+  comment   String?  @db.Text
+  isApproved Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@map("reviews")
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@map("wishlist_items")
+}
+
+model CompareItem {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@map("compare_items")
+}
+
+model Coupon {
+  id            String        @id @default(cuid())
+  code          String        @unique
+  discountType  String
+  discountValue Float
+  minOrderValue Float?
+  maxUses       Int?
+  usedCount     Int           @default(0)
+  expiresAt     DateTime?
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  orders        Order[]
+  usages        CouponUsage[]
+
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id        String   @id @default(cuid())
+  couponId  String
+  userId    String
+  createdAt DateTime @default(now())
+  coupon    Coupon   @relation(fields: [couponId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([couponId, userId])
+  @@map("coupon_usages")
+}
+
+model Conversation {
+  id           String    @id @default(cuid())
+  userId       String
+  lastMessage  String?
+  lastMessageAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String        @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String?       @db.Text
+  imageUrl       String?
+  status         MessageStatus @default(SENT)
+  isFromAdmin    Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User          @relation(fields: [senderId], references: [id])
+
+  @@map("messages")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  titleAr   String
+  titleEn   String
+  bodyAr    String?
+  bodyEn    String?
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Banner {
+  id          String   @id @default(cuid())
+  titleAr     String?
+  titleEn     String?
+  subtitleAr  String?
+  subtitleEn  String?
+  image       String
+  link        String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("banners")
+}
+
+model SiteSettings {
+  id             String   @id @default(cuid())
+  key            String   @unique
+  value          String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("site_settings")
+}
