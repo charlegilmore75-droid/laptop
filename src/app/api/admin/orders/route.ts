@@ -16,7 +16,9 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status');
     const skip = (page - 1) * limit;
 
-   const where = status ? { status } : {}; 
+   const where = status
+  ? { status: status as any }
+  : {};
 
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
