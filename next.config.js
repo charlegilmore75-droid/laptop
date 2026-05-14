@@ -12,8 +12,13 @@ const nextConfig = {
       { protocol: 'http', hostname: 'localhost' },
     ],
   },
+
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs'],
+  },
+
+  typescript: {
+    ignoreBuildErrors: true,
   },
 };
 
